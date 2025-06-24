@@ -2,7 +2,7 @@
 
 it is a simple console based game
 
-## * **Naming Conventions**
+## **Naming Conventions**
 
 * file naming - snake case
 * variable naming - camel case
