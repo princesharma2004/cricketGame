@@ -1,5 +1,5 @@
 import os
-from typing import Optional, List, Dict, Union
+from typing import Optional, Dict, Any, Sequence
 from dotenv import load_dotenv
 import psycopg2
 
@@ -54,10 +54,9 @@ class DB:
                                     team1Runs INT NOT NULL,
                                     team2Runs INT NOT NULL,
                                     overs INT NOT NULL,
-                                    result VARCHAR(20) NOT NULL CHECK (result IN ('team1', 'team2', 'tie'))
-
+                                    result VARCHAR(20) NOT NULL CHECK (result IN ('team1', 'team2', 'tie')),
                                     CONSTRAINT fk_team1 FOREIGN KEY (team1Id) REFERENCES teams(id) ON DELETE CASCADE,
-                                    CONSTRAINT fk_team2 FOREIGN KEY (team2Id) REFERENCES teams(id) ON DELETE CASCADE,
+                                    CONSTRAINT fk_team2 FOREIGN KEY (team2Id) REFERENCES teams(id) ON DELETE CASCADE
                                 );""")
 
             self._conn.commit()
@@ -86,21 +85,21 @@ class DB:
             print("Error inserting cricketer:", error)
 
 
-    def read_cricketers(self) -> List[Dict[str, Union[int, str]]]:
+    def read_cricketers(self) -> Dict[str, Sequence[Any]]:
         if self._cur is None or self._conn is None:
             print("Database connection is not available!")
-            return []
+            return {}
         
         try:
             self._cur.execute("SELECT id, name, playerType, teamId FROM cricketers;")
             rows = self._cur.fetchall()
-            return [{"id": row[0], "name": row[1], "playerType": row[2], "teamId": row[3]} for row in rows]
+            return {"headers": ["id", "name", "playerType", "teamId"], "data": rows}
         except Exception as e:
             print("Error:", e)
-            return []
+            return {}
 
 
-    def update_cricketer(self, id: int, name: Optional[str] = None, playerType: Optional[str] = None) -> None:
+    def update_cricketer(self, id: int, name: Optional[str] = None, playerType: Optional[str] = None, teamId: Optional[int] = None) -> None:
         if self._cur is None or self._conn is None:
             print("Database connection is not available.")
             return
@@ -110,6 +109,10 @@ class DB:
                 self._cur.execute("UPDATE cricketers SET name=%s WHERE id=%s", (name, id))
             if playerType is not None:
                 self._cur.execute("UPDATE cricketers SET playerType=%s WHERE id=%s", (playerType, id))
+            if teamId is not None:
+                self._cur.execute("UPDATE cricketers SET teamId=%s WHERE id=%s", (teamId, id))
+            if name is None and playerType is None and teamId is None:
+                self._cur.execute("UPDATE cricketers SET teamId=%s WHERE id=%s", (None, id))
             self._conn.commit()
             print("Cricketer updated successfully!")
         except Exception as error:
@@ -145,18 +148,18 @@ class DB:
             self._conn.rollback()
             print("Error creating team:", e)
 
-    def read_teams(self) -> List[Dict[str, Union[int, str]]]:
+    def read_teams(self) -> Dict[str, Sequence[Any]]:
         if self._cur is None or self._conn is None:
             print("Database connection is not available.")
-            return []
+            return {}
 
         try:
             self._cur.execute("SELECT id, name FROM teams;")
             rows = self._cur.fetchall()
-            return [{"id": row[0], "name": row[1]} for row in rows]
+            return {"headers": ["id", "name"], "data": rows}
         except Exception as e:
             print("Error reading teams:", e)
-            return []
+            return {}
 
     def update_team(self, id: int, name: str) -> None:
         if self._cur is None or self._conn is None:
@@ -199,10 +202,8 @@ class DB:
             else:
                 result = "tie"
 
-            self._cur.execute("""
-                INSERT INTO matches (team1Id, team2Id, team1Runs, team2Runs, overs, result)
-                VALUES (%s, %s, %s, %s, %s, %s);
-            """, (team1Id, team2Id, team1Runs, team2Runs, overs, result))
+            self._cur.execute("""INSERT INTO matches (team1Id, team2Id, team1Runs, team2Runs, overs, result)
+                              VALUES (%s, %s, %s, %s, %s, %s);""",(team1Id, team2Id, team1Runs, team2Runs, overs, result))
 
             self._conn.commit()
             print("Match created successfully!")
@@ -210,32 +211,18 @@ class DB:
             self._conn.rollback()
             print("Error creating match:", e)
 
-    def read_matches(self) -> List[Dict[str, int]]:
+    def read_matches(self) -> Dict[str, Sequence[Any]]:
         if self._cur is None or self._conn is None:
             print("Database connection is not available.")
-            return []
+            return {}
 
         try:
-            self._cur.execute("""
-                SELECT id, team1Id, team2Id, team1Runs, team2Runs, overs, result
-                FROM matches;
-            """)
+            self._cur.execute("""SELECT id, team1Id, team2Id, team1Runs, team2Runs, overs, result FROM matches;""")
             rows = self._cur.fetchall()
-            return [
-                {
-                    "id": row[0],
-                    "team1Id": row[1],
-                    "team2Id": row[2],
-                    "team1Runs": row[3],
-                    "team2Runs": row[4],
-                    "overs": row[5],
-                    "result": row[6]
-                }
-                for row in rows
-            ]
+            return {"headers": ["id", "team1Id", "team2Id", "team1Runs", "team2Runs", "overs", "result"], "data": rows}
         except Exception as e:
             print("Error reading matches:", e)
-            return []
+            return {}
         
     def close(self):
         if self._cur:
